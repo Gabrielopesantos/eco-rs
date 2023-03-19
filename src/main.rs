@@ -1,10 +1,11 @@
 #![allow(unused)]
+//#![deny(warnings)]
 
 use clap::Parser;
 use warp::Filter;
 
 #[derive(Parser, Debug)]
-struct Arguments {
+pub struct Arguments {
     #[arg(long, default_value_t = (":8081").to_string())]
     listen: String,
 
@@ -20,12 +21,43 @@ async fn main() {
     // Parse arguments
     let args = Arguments::parse();
 
-    let health = warp::path!("health").map(|| "{\"status\": \"ok\"}");
-    let echo = warp::path!().map(move || {
-        args.response_body.clone()
+    let api = filters::filters(args);
+
+    //let echo_routes = api.with(warp::log("")); // Not working
+
+    let health_check = warp::path!("health").map(|| {
+        warp::http::Response::builder()
+            .status(warp::http::StatusCode::OK)
+            .body("\"status\": \"ok\"")
     });
 
-    let routes = echo.or(health);
+    let routes = api.or(health_check);
 
-    warp::serve(routes).run(([127, 0, 0, 1], 8081)).await;
+    warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
+}
+
+mod filters {
+    use super::handlers;
+    use super::Arguments;
+    use warp::Filter;
+
+    pub fn filters(
+        args: Arguments,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        echo()
+    }
+
+    // echo filter
+    pub fn echo() -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+        warp::path!().and(warp::get()).and_then(handlers::echo)
+    }
+}
+
+mod handlers {
+    use std::convert::Infallible; // What is this for?
+    use warp::http::StatusCode;
+
+    pub async fn echo() -> Result<impl warp::Reply, Infallible> {
+        Ok(String::from("Hello world"))
+    }
 }
