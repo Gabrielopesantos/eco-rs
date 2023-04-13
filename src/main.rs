@@ -4,10 +4,10 @@
 use clap::Parser;
 use warp::Filter;
 
-#[derive(Parser, Debug, Clone)] // Clone?
+#[derive(Parser, Debug, Clone)]
 pub struct Arguments {
-    #[arg(long, default_value_t = (":8081").to_string())]
-    listen: String,
+    #[arg(long, default_value_t = (8081))]
+    listen: u16,
 
     #[arg(long = "response_status", default_value_t = 200)]
     response_status_code: u16,
@@ -16,14 +16,14 @@ pub struct Arguments {
     response_body: String,
 }
 
-#[tokio::main] // main isn't allowed to be async without this
+#[tokio::main]
 async fn main() {
     // Parse arguments
     let args = Arguments::parse();
 
-    let api = filters::filters(args);
+    let api = filters::filters(args.clone()); // clone
 
-    //let echo_routes = api.with(warp::log("")); // Not working
+    // let echo_routes = api.with(warp::log(""));
 
     let health_check = warp::path!("health").map(|| {
         warp::http::Response::builder()
@@ -33,7 +33,7 @@ async fn main() {
 
     let routes = api.or(health_check);
 
-    warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
+    warp::serve(routes).run(([127, 0, 0, 1], args.listen)).await;
 }
 
 mod filters {
@@ -59,7 +59,7 @@ mod filters {
     fn with_args(
         args: Arguments,
     ) -> impl Filter<Extract = (Arguments,), Error = std::convert::Infallible> + Clone {
-        warp::any().map(move || args.clone()) // Clone?
+        warp::any().map(move || args.clone())
     }
 }
 
